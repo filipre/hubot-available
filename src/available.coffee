@@ -15,8 +15,10 @@
 # Author:
 #   René Filip <renefilip@mail.com>
 
+
 CronJob = require('cron').CronJob
 async = require 'async'
+moment = require 'moment'
 # humanToCron = require('human-to-cron')
 
 # Running "Cronjobs" by the npm cron package
@@ -27,50 +29,44 @@ checkUrl = (url, room, robot) ->
 
   performRequest = (callback, result) ->
     robot.http(url).get() (err, res, body) ->
+
       # HTTP error
       if err
-        return callback err, null
+        return callback err, 500 # TODO: status code?
 
-      # JSON Parsing Error (maybe not a json)
-      try
-        result = JSON.parse body
-      catch err
-        return callback err, null
-
-      # # no 'text' property
-      # if not result.hasOwnProperty 'text'
-      #   err = "JSON does not have a 'text' property at root"
-      #   return callback err, null
+      # TODO
+      # find out about the status code
+      console.log res
 
       # TODO
       # return error or result depending on HTTP status code
 
-      return callback null, result.text
+      return callback null, 200 # TODO: status code?
 
-  notifyUser = (err, text) ->
-    # after 3 tries mark url as broken and notify user the first time
+  notifyUser = (err, status) ->
+    # after some tries mark url as broken and notify user the first time
     if err
       if not robot.brain.data.available[room][url].broken
-        robot.messageRoom room, "#{url} is not working: #{err}"
-      robot.brain.data.available[room][url].broken = true
+        robot.brain.data.available[room][url].broken = true
+        robot.brain.data.available[room][url].downtime = moment()
+        robot.messageRoom room, "#{url} is not working [#{status}]: #{err}"
+
       return
 
-    # URL is working (again)
+    # notify the user if url works again
+    if robot.brain.data.available[room][url].broken
+      robot.brain.data.available[room][url].broken = false
+      downtime = robot.brain.data.available[room][url].downtime
+      duration = moment.duration(end.diff(downtime)).humanize()
+
+      robot.messageRoom room, "#{url} works again. Yeah! Downtime: #{duration}"
 
     # TODO
-    # notify the user that it is working again
-
-    # robot.brain.data.available[room][url].broken = false
-    # if robot.brain.data.available[room][url].text isnt text
-    #   robot.brain.data.available[room][url].text = text
-    #   robot.messageRoom room, "#{text}"
-
-    # TODO
-    # think of better reply message (with error code, message, status, date, gist?, ...)
+    # think of better reply message (with error code, message, status, date, downtime, gist?, ...)
 
   async.retry {
-    times: 3  # TODO: maybe ENV?
-    interval: 5000 # TODO: maybe ENV?
+    times: process.env.HUBOT_AVAILABLE_RETRIES || 5
+    interval: process.env.HUBOT_AVAILABLE_INTERVAL || 5000
   }, performRequest, notifyUser
 
 

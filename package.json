@@ -14,7 +14,8 @@
   },
   "dependencies": {
     "async": "^1.4.2",
-    "cron": "^1.0.9"
+    "cron": "^1.0.9",
+    "moment": "^2.10.6"
   },
   "peerDependencies": {
     "hubot": "2.x"
