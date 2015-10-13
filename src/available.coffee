@@ -16,10 +16,12 @@
 #   René Filip <renefilip@mail.com>
 
 
+# TODO: some nice sentences for hubot with random ...
+
 CronJob = require('cron').CronJob
 async = require 'async'
 moment = require 'moment'
-# humanToCron = require('human-to-cron')
+HttpStatus = require 'http-status-codes'
 
 # Running "Cronjobs" by the npm cron package
 jobs = {}
@@ -30,39 +32,39 @@ checkUrl = (url, room, robot) ->
   performRequest = (callback, result) ->
     robot.http(url).get() (err, res, body) ->
 
-      # HTTP error
       if err
-        return callback err, 500 # TODO: status code?
+        return callback err
 
-      # TODO
-      # find out about the status code
-      console.log res
+      acceptedCodes = [
+        HttpStatus.OK,
+        HttpStatus.CREATED,
+        HttpStatus.ACCEPTED,
+        HttpStatus.NON_AUTHORITATIVE_INFORMATION,
+        HttpStatus.NO_CONTENT,
+        HttpStatus.RESET_CONTENT,
+        HttpStatus.PARTIAL_CONTENT,
+        HttpStatus.MULTI_STATUS
+      ]
+      if res.statusCode not in acceptedCodes
+        return callback "Unsuccessful status code #{res.statusCode}: #{HttpStatus.getStatusText(res.statusCode)}"
 
-      # TODO
-      # return error or result depending on HTTP status code
+      return callback null
 
-      return callback null, 200 # TODO: status code?
-
-  notifyUser = (err, status) ->
+  notifyUser = (err) ->
     # after some tries mark url as broken and notify user the first time
     if err
       if not robot.brain.data.available[room][url].broken
         robot.brain.data.available[room][url].broken = true
         robot.brain.data.available[room][url].downtime = moment()
-        robot.messageRoom room, "#{url} is not working [#{status}]: #{err}"
-
+        robot.messageRoom room, "#{url} is not working: #{err}"
       return
 
     # notify the user if url works again
     if robot.brain.data.available[room][url].broken
       robot.brain.data.available[room][url].broken = false
       downtime = robot.brain.data.available[room][url].downtime
-      duration = moment.duration(end.diff(downtime)).humanize()
-
+      duration = moment.duration(moment().diff(downtime)).humanize()
       robot.messageRoom room, "#{url} works again. Yeah! Downtime: #{duration}"
-
-    # TODO
-    # think of better reply message (with error code, message, status, date, downtime, gist?, ...)
 
   async.retry {
     times: process.env.HUBOT_AVAILABLE_RETRIES || 5
